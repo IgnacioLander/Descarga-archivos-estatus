@@ -1,0 +1,22 @@
+import re
+from playwright.sync_api import Playwright, sync_playwright, expect
+
+
+def run(playwright: Playwright) -> None:
+    browser = playwright.chromium.launch(headless=False)
+    context = browser.new_context(storage_state="auth.json")
+    page = context.new_page()
+    page.goto("https://accounts.google.com/InteractiveLogin/signinchooser?continue=https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F0AAjNTltlHaksUk9PVA&followup=https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F0AAjNTltlHaksUk9PVA&osid=1&passive=1209600&service=wise&ifkv=ASSHykr3eSoGepfHsIPb76UXrlHLe-0juob9lu5ZPw5hNZqE2dXYd3bOLV0mMSb9RcThNmxtKdi-&ddm=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin")
+    page.get_by_role("link", name="Ignacio Enrique Lander").click()
+    page.get_by_label("Introduce tu contraseña").click()
+    page.get_by_label("Introduce tu contraseña").fill("Ivflr282529Q$$")
+    page.get_by_label("Introduce tu contraseña").press("Enter")
+    page.close()
+
+    # ---------------------
+    context.close()
+    browser.close()
+
+
+with sync_playwright() as playwright:
+    run(playwright)

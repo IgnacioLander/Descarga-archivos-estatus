@@ -1,0 +1,41 @@
+import re
+from playwright.sync_api import Playwright, sync_playwright, expect
+
+
+def run(playwright: Playwright) -> None:
+    browser = playwright.chromium.launch(headless=False)
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto("https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F0AAjNTltlHaksUk9PVA&followup=https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F0AAjNTltlHaksUk9PVA&ifkv=AcMMx-eMOEDLLuUZK90UxVmNoIsbgN9q4oHEvI4EDyFOLMptpI8XyulmQeQu-r9z7V4JEWGWSgm46Q&osid=1&passive=1209600&service=wise&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S-399353172%3A1732292887662354&ddm=1")
+    page.get_by_label("Correo electrónico o teléfono").click()
+    page.get_by_label("Correo electrónico o teléfono").fill("ignacio.lander@farmatodo.com")
+    page.get_by_role("button", name="Siguiente").click()
+    page.get_by_label("Introduce tu contraseña").fill("@Nacho280801.$$")
+    page.get_by_role("button", name="Siguiente").click()
+    page.goto("https://drive.google.com/drive/folders/0AAjNTltlHaksUk9PVA")
+    page.locator("div").filter(has_text=re.compile(r"^ESTATUS ESCUELA COMERCIAL$")).first.dblclick()
+    page.get_by_role("row", name="Cuidado del Cabello Hojas de").click(button="right")
+    page.locator("div").filter(has_text=re.compile(r"^Nombre$")).first.click()
+    page.locator("div").filter(has_text=re.compile(r"^No se aplicó ningún filtroTipoPersonasModificado$")).first.click(button="right")
+    page.get_by_text("NombreÚltima modificaciónTama").click(button="right")
+    page.get_by_label("Subir archivo", exact=True).click()
+    page.get_by_role("row", name="ReporteActividad2286202411201500066042.xlsx Excel Modificada por última vez por").set_input_files("ReporteActividad2286202411121850338859.xlsx")
+    page.get_by_role("button", name="Última modificación").click()
+    page.get_by_role("menuitemcheckbox", name="Últimos que abrí").locator("span").click()
+    with page.expect_popup() as page1_info:
+        page.locator("div").filter(has_text=re.compile(r"^ReporteActividad2286202411121850338859\.xlsx$")).first.dblclick()
+    page1 = page1_info.value
+    page1.goto("https://docs.google.com/spreadsheets/d/1iZx5_CzBEalvBdoV6v9MsB4qWfr9NhzP/edit?gid=1713103934#gid=1713103934")
+    page1.get_by_label("Barra de menú").get_by_role("menuitem", name="Archivo").click()
+    with page1.expect_popup() as page2_info:
+        page1.locator("#waffle-rich-text-editor").click()
+    page2 = page2_info.value
+    page2.goto("https://docs.google.com/spreadsheets/d/1NnYKyuxVmCd7fAnqA_jgR1J8IUvdviczXszwqDrMcoU/edit?gid=1713103934#gid=1713103934")
+
+    # ---------------------
+    context.close()
+    browser.close()
+
+
+with sync_playwright() as playwright:
+    run(playwright)
