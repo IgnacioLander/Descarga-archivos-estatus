@@ -10,7 +10,7 @@ import pandas as pd
 
 def descomprimir_y_leer_excel(zip_file_path, download_path, nuevo_nombre):
     # Nombre de la nueva carpeta
-    carpeta_destino = "Escuela de Excelencia"
+    carpeta_destino = "Escuela de Servicio"
     
     # Crear la nueva carpeta si no existe
     nueva_carpeta = os.path.join(download_path, carpeta_destino)
@@ -50,57 +50,45 @@ def run(playwright: Playwright) -> None:
     page.get_by_role("textbox", name="Email / NUMERO IDENTIDAD").fill("27670903")
     page.get_by_role("textbox", name="Contraseña").click()
     page.get_by_role("textbox", name="Contraseña").fill("27670903")
-    page.get_by_role("link", name="Entrar").click()
+    page.locator("#ctl00_cpMainContent_LoginFormControlNew_LoginButton").click()
     page.locator("#manageIcon").click()
-    time.sleep(5)
     page.locator("#ctl00_TopMenuControl_TopMenuDesktopControl1_adminOrTeacherSearch").click()
-    page.get_by_placeholder("Escribe aquí para buscar...").fill("manejo de planogramas")
+    time.sleep(5)
+    page.get_by_placeholder("Escribe aquí para buscar...").fill("Qué hacer y qué no hacer en el servicio al cliente - Parte 1")
     page.get_by_role("link", name="Buscar").click()
-    page.get_by_role("link", name="Programa Manejo de").click()
-    page.locator("#courses").click()
-    page.get_by_title("Select/Deselect All").get_by_role("checkbox").check()
-    page.get_by_role("link", name="Ordenar").click()
-    page.get_by_role("button").click()
+    page.locator(".slick-cell").first.click()
     page.get_by_role("link", name="Nuevo reporte").click()
     page.locator("#popup-new-report-useractivity-report-icon").click()
-    page.locator("#column-date-filter_selectedArea").get_by_text("Último acceso").click()
+    page.locator("span").filter(has_text="Último acceso").first.click()
     page.get_by_text("Sin filtros").click()
     page.get_by_text("seleccionados").click()
-    page.locator("#report-column-dropdown-container div").filter(has_text="NUMERO IDENTIDAD").nth(1).click()
     page.locator("input[name=\"Identifier\"]").check()
     page.locator("input[name=\"Department\"]").check()
     page.locator("input[name=\"Country\"]").check()
-    page.locator("input[name=\"UserStatus\"]").check()
     page.locator("input[name=\"EnrolledAs\"]").check()
+    page.locator("#report-column-dropdown-container div").filter(has_text="Estado").nth(1).click()
     page.locator("input[name=\"Deleted\"]").uncheck()
-    page.locator("input[name=\"EnrollmentDate\"]").uncheck()
-    page.locator("input[name=\"FirstAccessDate\"]").uncheck()
-    page.locator("input[name=\"LastAccessDate\"]").uncheck()
+    page.locator("#report-column-dropdown-container").get_by_text("Fecha de inscripción").click()
+    page.locator("#report-column-dropdown-container").get_by_text("Primer acceso").click()
+    page.locator("#report-column-dropdown-container div").filter(has_text="Último acceso").nth(1).click()
     page.locator("input[name=\"GraduationDate\"]").uncheck()
     page.locator("input[name=\"Satisfaction\"]").uncheck()
-    page.locator("input[name=\"Progress\"]").uncheck()
-    page.locator("input[name=\"Progress\"]").check()
+    page.locator("input[name=\"UserStatus\"]").check()
     page.locator("input[name=\"Attendance\"]").uncheck()
     page.locator("input[name=\"CourseAccessCount\"]").uncheck()
     page.locator("input[name=\"TimeOnCourse\"]").uncheck()
     page.locator("input[name=\"CompletedContentCount\"]").uncheck()
     page.get_by_role("link", name="Aplicar").click()
     page.locator("a").filter(has_text="Exportar a excel").click()
-    
-    # Esperar a que el botón de descarga esté visible y hacer clic
+    time.sleep(90)
     with page.expect_download() as download_info:
-        # Wait for the element to be visible and interactable
-        time.sleep(90)  # Esperar a que la página se actualice
-        page.wait_for_selector("text=Descargar Guardando Guardado", timeout=10000)
         page.get_by_text("Descargar Guardando Guardado").click()
     download = download_info.value
-    
     download_path = os.path.join(os.getcwd(), "downloads")
     os.makedirs(download_path, exist_ok=True)
     zip_file_path = os.path.join(download_path, f"test.zip")
     download.save_as(zip_file_path)  # Confirmación de descarga
-    df = descomprimir_y_leer_excel(zip_file_path, download_path, "Manejo")
-    print(df)  # Mostrar el DataFrame
+    df = descomprimir_y_leer_excel(zip_file_path, download_path, "Que hacer call")
     
     # Cerrar el navegador y el contexto
     context.storage_state(path="auth.json")
@@ -109,4 +97,3 @@ def run(playwright: Playwright) -> None:
 
 with sync_playwright() as playwright:
     run(playwright)
-    
