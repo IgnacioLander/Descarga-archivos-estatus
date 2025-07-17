@@ -11,48 +11,49 @@ on:
 jobs:
   download:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        task: [Manejo, Pilares, control]
-      fail-fast: false
-
     env:
       PYTHONPATH: src
 
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - Manejo
+          - Pilares
+          - control
+
     steps:
-      - name: Check out code
+      - name: "Check out code"
         uses: actions/checkout@v3
 
-      - name: Debug: Show workspace layout
+      - name: "Debug: Show workspace layout"
         run: |
           echo "GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
-          echo "Files in repo:"
           ls -R .
 
-      - name: Debug: Dump workflow file
+      - name: "Debug: Show workflow file"
         run: |
           echo "---- .github/workflows/scheduled-download.yml ----"
           sed -n '1,200p' .github/workflows/scheduled-download.yml
           echo "-----------------------------------------------"
 
-      - name: Set up Python & Playwright
+      - name: "Set up Python & Playwright"
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: "Install dependencies"
         run: |
           pip install -r requirements.txt
           playwright install --with-deps
 
-      - name: Run downloader ${{ matrix.task }}
+      - name: "Run downloader ${{ matrix.task }}"
         run: python src/descarga_archivos/download.py ${{ matrix.task }}
         env:
           F_EMAIL: ${{ secrets.F_EMAIL }}
           F_PASSWORD: ${{ secrets.F_PASSWORD }}
 
-      - name: Upload ${{ matrix.task }} to Google Drive
+      - name: "Upload ${{ matrix.task }} to Google Drive"
         run: python src/descarga_archivos/upload_to_drive.py "downloads/Escuela de Excelencia/${{ matrix.task }}.xlsx"
         env:
           GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
