@@ -1,0 +1,40 @@
+name: Weekly File Download & Upload
+
+on:
+  schedule:
+    - cron: '0 4 * * 3'      # Every Wednesday at 04:00 UTC
+  workflow_dispatch:         # Manual trigger
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        task: [Manejo, Pilares, control]
+      fail-fast: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Python & Playwright
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps
+
+      - name: Run downloader ${{ matrix.task }}
+        run: python src/descarga_archivos/download.py ${{ matrix.task }}
+        env:
+          F_EMAIL: ${{ secrets.F_EMAIL }}
+          F_PASSWORD: ${{ secrets.F_PASSWORD }}
+
+      - name: Upload ${{ matrix.task }} to Google Drive
+        run: python src/descarga_archivos/upload_to_drive.py "downloads/Escuela de Excelencia/${{ matrix.task }}.xlsx"
+        env:
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
