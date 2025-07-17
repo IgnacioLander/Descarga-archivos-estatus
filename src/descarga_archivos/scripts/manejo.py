@@ -19,47 +19,57 @@ def run(playwright):
         print("🌐 Accediendo a https://academia.farmatodo.com ...")
         page.goto("https://academia.farmatodo.com", timeout=60_000)
 
-        print("🔍 Esperando campo de identidad...")
-        page.wait_for_selector("input[name='Email / NUMERO IDENTIDAD']", timeout=60_000)
+        print("⏳ Esperando que cargue el HTML...")
+        page.wait_for_load_state("networkidle", timeout=60_000)
+
+        print("🔍 Buscando input de identidad (modo garantizado)...")
+        selector_xpath = "//input[contains(@placeholder, 'identidad') or contains(@aria-label, 'identidad') or contains(@name, 'identidad') or contains(@name, 'Email')]"
+
+        try:
+            input_locator = page.locator(selector_xpath).first
+            input_locator.wait_for(state="visible", timeout=60_000)
+            print("✅ Input localizado correctamente.")
+        except:
+            print("❌ No se encontró el input esperado.")
+            guardar_debug(page)
+            print("📝 HTML capturado:")
+            print(page.content())  # Esto imprime el HTML cargado
+            raise Exception("No se encontró el input de login.")
 
         print("✍️ Llenando formulario de login...")
-        page.fill("input[name='Email / NUMERO IDENTIDAD']", F_EMAIL)
-        page.fill("input[name='password']", F_PASSWORD)
+        input_locator.fill(F_EMAIL)
+        page.fill("input[type='password']", F_PASSWORD)
         page.click("button:has-text('Iniciar sesión')")
 
-        print("⏳ Esperando que cargue después del login...")
+        print("⏳ Esperando página de inicio...")
         page.wait_for_load_state("networkidle", timeout=30_000)
 
-        # Validar si realmente entró al dashboard (ajusta este selector según lo que veas)
         if page.query_selector("text=Mi progreso") is None:
-            raise Exception("⚠️ No se detectó el texto esperado luego del login. Puede haber fallado el acceso.")
+            raise Exception("⚠️ Login no exitoso: 'Mi progreso' no detectado.")
 
         print("✅ Login exitoso. Continuando con el flujo...")
 
-        # Aquí continúa tu lógica (navegar, descargar, etc.)
-
+        # Aquí iría tu lógica después del login
         context.close()
         browser.close()
 
     except PlaywrightTimeoutError as e:
-        print("⏱️ Timeout esperando un selector. Capturando estado para depuración...")
+        print("⏱️ Timeout. Guardando estado...")
         guardar_debug(page)
         raise e
 
     except Exception as e:
-        print(f"❌ Error durante el proceso: {e}")
+        print(f"❌ Error inesperado: {e}")
         guardar_debug(page)
         raise e
-
 
 def guardar_debug(page):
     os.makedirs("debug", exist_ok=True)
     try:
-        print("🧾 Guardando página HTML...")
         with open("debug/error_page.html", "w", encoding="utf-8") as f:
             f.write(page.content())
-
-        print("📸 Capturando pantalla...")
         page.screenshot(path="debug/error_login.png")
+        print("📁 Archivos guardados en /debug")
     except Exception as e:
         print(f"⚠️ Error al guardar archivos de depuración: {e}")
+
