@@ -24,6 +24,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
+      - name: Debug: show GitHub Actions workspace
+        run: |
+          echo "GITHUB_WORKSPACE is $GITHUB_WORKSPACE"
+          echo "Listing all files:"
+          ls -R .
+
       - name: Set up Python & Playwright
         uses: actions/setup-python@v4
         with:
