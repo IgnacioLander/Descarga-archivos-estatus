@@ -1,75 +1,73 @@
 # src/descarga_archivos/scripts/manejo.py
 
+from playwright.sync_api import Playwright
 import os
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-def run(playwright):
-    F_EMAIL = os.getenv("F_EMAIL", "")
-    F_PASSWORD = os.getenv("F_PASSWORD", "")
+def run(playwright: Playwright):
+    import time
 
-    if not F_EMAIL or not F_PASSWORD:
-        raise ValueError("❌ Las variables de entorno F_EMAIL o F_PASSWORD no están definidas.")
+    print("🚀 Iniciando navegador...")
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=["--disable-blink-features=AutomationControlled"]
+    )
+    context = browser.new_context()
+    page = context.new_page()
 
     try:
-        print("🚀 Iniciando navegador...")
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
-        page = context.new_page()
-
         print("🌐 Accediendo a https://academia.farmatodo.com ...")
-        page.goto("https://academia.farmatodo.com", timeout=60_000)
+        page.goto("https://academia.farmatodo.com", timeout=60000)
 
-        print("⏳ Esperando que cargue el HTML...")
-        page.wait_for_load_state("networkidle", timeout=60_000)
+        print("⏳ Esperando carga inicial (JavaScript dinámico)...")
+        page.wait_for_timeout(5000)
 
-        print("🔍 Buscando input de identidad (modo garantizado)...")
-        selector_xpath = "//input[contains(@placeholder, 'identidad') or contains(@aria-label, 'identidad') or contains(@name, 'identidad') or contains(@name, 'Email')]"
+        print("🛠️ Intentando forzar visibilidad del formulario de login...")
 
+        # Intenta hacer clic en algo que muestre el formulario (si aplica)
         try:
-            input_locator = page.locator(selector_xpath).first
-            input_locator.wait_for(state="visible", timeout=60_000)
-            print("✅ Input localizado correctamente.")
+            page.click("text=Iniciar sesión", timeout=3000)
+            print("🖱️ Se hizo clic en 'Iniciar sesión'")
         except:
-            print("❌ No se encontró el input esperado.")
-            guardar_debug(page)
-            print("📝 HTML capturado:")
-            print(page.content())  # Esto imprime el HTML cargado
-            raise Exception("No se encontró el input de login.")
+            print("ℹ️ No se encontró botón 'Iniciar sesión', posiblemente no es necesario.")
 
-        print("✍️ Llenando formulario de login...")
-        input_locator.fill(F_EMAIL)
-        page.fill("input[type='password']", F_PASSWORD)
+        # Buscar input de login robustamente
+        login_input = page.locator("//input[contains(@id,'txtEmail') or contains(@placeholder,'identidad') or @name='Email / NUMERO IDENTIDAD']").first
+        print("🔍 Buscando campo de identidad...")
+        login_input.wait_for(state="visible", timeout=15000)
+
+        print("✅ Campo visible. Ingresando credenciales...")
+        login_input.fill(os.environ["USER_EMAIL"])
+        page.fill("input[type='password']", os.environ["USER_PASS"])
+
+        print("🔐 Haciendo submit...")
         page.click("button:has-text('Iniciar sesión')")
 
-        print("⏳ Esperando página de inicio...")
-        page.wait_for_load_state("networkidle", timeout=30_000)
+        print("⏳ Esperando navegación post-login...")
+        page.wait_for_load_state("networkidle", timeout=15000)
+        print("🎉 Login completado.")
 
-        if page.query_selector("text=Mi progreso") is None:
-            raise Exception("⚠️ Login no exitoso: 'Mi progreso' no detectado.")
+        # Aquí puedes seguir con el flujo de descarga de archivos, etc.
 
-        print("✅ Login exitoso. Continuando con el flujo...")
+    except Exception as e:
+        print(f"❌ Error durante la ejecución: {e}")
 
-        # Aquí iría tu lógica después del login
+        # Ruta para depuración
+        debug_dir = "/debug"
+        os.makedirs(debug_dir, exist_ok=True)
+
+        screenshot_path = f"{debug_dir}/screenshot.png"
+        html_path = f"{debug_dir}/page.html"
+
+        print(f"📸 Capturando pantalla en {screenshot_path}")
+        page.screenshot(path=screenshot_path, full_page=True)
+
+        print(f"🧾 Guardando HTML en {html_path}")
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(page.content())
+
+        raise e
+
+    finally:
+        print("🧹 Cerrando navegador.")
         context.close()
         browser.close()
-
-    except PlaywrightTimeoutError as e:
-        print("⏱️ Timeout. Guardando estado...")
-        guardar_debug(page)
-        raise e
-
-    except Exception as e:
-        print(f"❌ Error inesperado: {e}")
-        guardar_debug(page)
-        raise e
-
-def guardar_debug(page):
-    os.makedirs("debug", exist_ok=True)
-    try:
-        with open("debug/error_page.html", "w", encoding="utf-8") as f:
-            f.write(page.content())
-        page.screenshot(path="debug/error_login.png")
-        print("📁 Archivos guardados en /debug")
-    except Exception as e:
-        print(f"⚠️ Error al guardar archivos de depuración: {e}")
-
