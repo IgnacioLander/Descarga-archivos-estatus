@@ -48,10 +48,11 @@ jobs:
           playwright install --with-deps
 
       - name: "Run downloader ${{ matrix.task }}"
-        run: python src/descarga_archivos/download.py ${{ matrix.task }}
+        run: python -m descarga_archivos.download ${{ matrix.task }}
         env:
           F_EMAIL: ${{ secrets.F_EMAIL }}
           F_PASSWORD: ${{ secrets.F_PASSWORD }}
+
 
       - name: "Upload ${{ matrix.task }} to Google Drive"
         run: python src/descarga_archivos/upload_to_drive.py "downloads/Escuela de Excelencia/${{ matrix.task }}.xlsx"
