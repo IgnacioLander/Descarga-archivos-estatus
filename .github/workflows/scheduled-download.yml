@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
   schedule:
-    - cron: '0 5 * * 3'      # Every Wednesday at 04:00 UTC
-  workflow_dispatch:         # Manual trigger
+    - cron: '0 4 * * 3'
 
 jobs:
   download:
@@ -16,7 +16,7 @@ jobs:
       matrix:
         task: [Manejo, Pilares, control]
       fail-fast: false
-    
+
     env:
       PYTHONPATH: src
 
@@ -24,11 +24,17 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Debug: show GitHub Actions workspace
+      - name: Debug: Show workspace layout
         run: |
-          echo "GITHUB_WORKSPACE is $GITHUB_WORKSPACE"
-          echo "Listing all files:"
+          echo "GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
+          echo "Files in repo:"
           ls -R .
+
+      - name: Debug: Dump workflow file
+        run: |
+          echo "---- .github/workflows/scheduled-download.yml ----"
+          sed -n '1,200p' .github/workflows/scheduled-download.yml
+          echo "-----------------------------------------------"
 
       - name: Set up Python & Playwright
         uses: actions/setup-python@v4
@@ -37,7 +43,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e .
           pip install -r requirements.txt
           playwright install --with-deps
 
