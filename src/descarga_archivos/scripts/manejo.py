@@ -1,72 +1,45 @@
 # src/descarga_archivos/scripts/manejo.py
 
-from playwright.sync_api import Playwright
+# src/descarga_archivos/scripts/manejo.py
 import os
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-def run(playwright: Playwright):
-    import time
+def run():
+    email = os.getenv("F_EMAIL")
+    password = os.getenv("F_PASSWORD")
+
+    if not email or not password:
+        raise Exception("❌ Las credenciales F_EMAIL y F_PASSWORD no están definidas.")
 
     print("🚀 Iniciando navegador...")
-    browser = playwright.chromium.launch(
-        headless=True,
-        args=["--disable-blink-features=AutomationControlled"]
-    )
-    context = browser.new_context()
-    page = context.new_page()
 
-    try:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
         print("🌐 Accediendo a https://academia.farmatodo.com ...")
         page.goto("https://academia.farmatodo.com", timeout=60000)
 
-        print("⏳ Esperando carga inicial...")
-        page.wait_for_timeout(5000)
-
-        print("🛠️ Verificando si hay que abrir el formulario...")
         try:
-            page.click("text=Iniciar sesión", timeout=3000)
-            print("🖱️ Se hizo clic en 'Iniciar sesión'")
-        except:
-            print("ℹ️ No se encontró botón 'Iniciar sesión', probablemente ya está visible.")
+            print("🔍 Esperando campo de identidad...")
+            page.wait_for_selector("input#topMenutxtEmail", timeout=15000)
 
-        print("🔍 Buscando campo de identidad...")
-        login_input = page.locator(
-            "//input[contains(@id,'txtEmail') or contains(@placeholder,'identidad') or @name='Email / NUMERO IDENTIDAD']"
-        ).first
-        login_input.wait_for(state="visible", timeout=15000)
+            print("⌨️ Ingresando credenciales...")
+            page.fill("input#topMenutxtEmail", email)
+            page.fill("input#topMenutxtPassword", password)
+            page.click("input#btnIngresar")
 
-        print("✅ Campo visible. Ingresando credenciales...")
-        login_input.fill(os.environ["F_EMAIL"])
-        page.fill("input[type='password']", os.environ["F_PASSWORD"])
+            print("✅ Login enviado. Esperando redirección...")
+            page.wait_for_load_state("networkidle", timeout=20000)
 
-        print("🔐 Haciendo submit...")
-        page.click("button:has-text('Iniciar sesión')")
+            # Aquí deberías poner la lógica para descargar el archivo
+            print("📥 (Ejemplo) Lógica de descarga aquí...")
 
-        print("⏳ Esperando navegación post-login...")
-        page.wait_for_load_state("networkidle", timeout=15000)
-        print("🎉 Login completado correctamente.")
-
-        # Aquí continúa el resto del flujo, si lo necesitas.
-
-    except Exception as e:
-        print(f"❌ Error durante la ejecución: {e}")
-
-        debug_dir = "/debug"
-        os.makedirs(debug_dir, exist_ok=True)
-
-        screenshot_path = f"{debug_dir}/screenshot.png"
-        html_path = f"{debug_dir}/page.html"
-
-        print(f"📸 Capturando pantalla en {screenshot_path}")
-        page.screenshot(path=screenshot_path, full_page=True)
-
-        print(f"🧾 Guardando HTML en {html_path}")
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(page.content())
-
-        raise e
-
-    finally:
-        print("🧹 Cerrando navegador.")
-        context.close()
-        browser.close()
-
+        except PlaywrightTimeoutError as e:
+            print("❌ Timeout esperando un elemento. HTML capturado.")
+            with open("page_error.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            raise e
+        finally:
+            print("🧹 Cerrando navegador.")
+            browser.close()
