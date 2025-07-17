@@ -16,6 +16,9 @@ jobs:
       matrix:
         task: [Manejo, Pilares, control]
       fail-fast: false
+    
+      env:
+        PYTHONPATH: src
 
     steps:
       - name: Check out code
