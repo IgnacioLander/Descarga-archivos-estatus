@@ -16,9 +16,15 @@ def main(task: str):
     # 2. Launch browser with custom download path
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
-        context.set_default_downloads_path(download_dir)
+
+        # → set downloads_path here
+        context = browser.new_context(
+            accept_downloads=True,
+            downloads_path=download_dir
+        )
+
         page = context.new_page()
+
 
         # 3. Dispatch to the correct script
         if task == "Manejo":
