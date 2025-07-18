@@ -1,35 +1,60 @@
-name: Descargas en serie
+name: Weekly File Download & Upload
 
 on:
-  schedule:
-    - cron: '0 11 * * 3'  # Miércoles a las 11:00 UTC (7:00 am ET)
+  push:
+    branches:
+      - main
   workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 3'
 
 jobs:
-  ejecutar-descargas:
+  download:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - Manejo
+          - Pilares
+          - control
+
     steps:
-      - name: Clonar el repositorio
+      - name: "Check out code"
         uses: actions/checkout@v3
 
-      - name: Configurar Python
+      - name: "Debug: Show workspace layout"
+        run: |
+          echo "GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
+          ls -R .
+
+      - name: "Debug: Show workflow file"
+        run: |
+          echo "---- .github/workflows/scheduled-download.yml ----"
+          sed -n '1,200p' .github/workflows/scheduled-download.yml
+          echo "-----------------------------------------------"
+
+      - name: "Set up Python & Playwright"
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Instalar dependencias
+      - name: "Install dependencies"
         run: |
-          python -m pip install --upgrade pip
-          # pip install -r requirements.txt
+          pip install -r requirements.txt
+          playwright install --with-deps
 
-      - name: Ejecutar descargaarchivos.py
-        run: python descargaarchivos.py
+      - name: "Run downloader ${{ matrix.task }}"
+        run: python -m descarga_archivos.download ${{ matrix.task }}
+        env:
+          F_EMAIL: ${{ secrets.F_EMAIL }}
+          F_PASSWORD: ${{ secrets.F_PASSWORD }}
 
-      - name: Ejecutar descargaarchivosES.py
-        run: python descargaarchivosES.py
 
-      - name: Ejecutar descargaasincronas.py
-        run: python descargaasincronas.py
-
-      - name: Ejecutar descargaarchivosEE.py
-        run: python descargaarchiv
+      - name: "Upload ${{ matrix.task }} to Google Drive"
+        run: python src/descarga_archivos/upload_to_drive.py "downloads/Escuela de Excelencia/${{ matrix.task }}.xlsx"
+        env:
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
