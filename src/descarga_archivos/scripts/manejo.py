@@ -1,59 +1,77 @@
-import os
-import sys
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+# src/descarga_archivos/scripts/manejo.py
 
-def run_manejo():
+import os
+from pathlib import Path
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+
+def run(page: Page) -> None:
+    """
+    Logs into academia.farmatodo.com under the 'Manejo' course context,
+    triggers the report download, and reports the saved path.
+    """
+
+    # Environment inputs
     email = os.getenv("F_EMAIL")
     password = os.getenv("F_PASSWORD")
+    download_dir = os.getenv("DOWNLOAD_DIR", "./downloads/Manejo")
 
-    print("🛠️ Iniciando proceso de login a academia.farmatodo.com...")
-
+    # Sanity checks
     if not email or not password:
-        print("❌ ERROR: F_EMAIL o F_PASSWORD no están definidas como variables de entorno.")
-        return
+        raise RuntimeError("F_EMAIL and F_PASSWORD must be set in env variables")
+    Path(download_dir).mkdir(parents=True, exist_ok=True)
 
-    with sync_playwright() as playwright:
-        print("🚀 Lanzando navegador Chromium en modo headless...")
-        browser = playwright.chromium.launch(headless=True)
-        page = browser.new_page()
+    try:
+        print("🚀 Navigating to login page…")
+        page.goto("https://academia.farmatodo.com", timeout=60000)
 
-        try:
-            print("🌐 Navegando a https://academia.farmatodo.com ...")
-            page.goto("https://academia.farmatodo.com", timeout=60000)
+        print("⌛ Waiting for login fields…")
+        page.wait_for_selector("input#topMenutxtEmail", timeout=15000)
+        page.wait_for_selector("input#topMenutxtContrasena", timeout=15000)
 
-            print("⌛ Esperando campo de email...")
-            page.wait_for_selector("input#topMenutxtEmail", timeout=15000)
+        print("✍️ Filling in credentials…")
+        page.fill("input#topMenutxtEmail", email)
+        page.fill("input#topMenutxtContrasena", password)
 
-            print("✍️ Ingresando email y contraseña...")
-            page.fill("input#topMenutxtEmail", email)
-            page.fill("input#topMenutxtContrasena", password)
+        print("🖱️ Submitting login form…")
+        page.click("button:has-text('Iniciar sesión')")
 
-            print("🖱️ Haciendo clic en 'Iniciar sesión'...")
-            page.click("button:has-text('Iniciar sesión')")
+        print("⏳ Waiting for dashboard to stabilize…")
+        page.wait_for_load_state("networkidle", timeout=30000)
+        print("✅ Login successful")
 
-            print("⏳ Esperando a que cargue el dashboard...")
-            page.wait_for_timeout(5000)  # Ajusta según carga real
+        # Navigate to the Manejo report section if needed
+        # e.g., page.click("a#menu-manejo")
 
-            print("✅ Login completado con éxito.")
+        print("📥 Triggering report download…")
+        with page.expect_download() as download_info:
+            # Adjust selector to your “Download” button
+            page.click("button:has-text('Descargar Informe')")
+        download = download_info.value
 
-        except PlaywrightTimeoutError as e:
-            print(f"❌ Timeout esperando elementos: {e}")
-            page.screenshot(path="error.png")
-            with open("error.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
-        except Exception as e:
-            print(f"❌ Error inesperado durante el login: {e}")
-        finally:
-            print("🧹 Cerrando navegador...")
-            browser.close()
+        # Wait for file to be written, then log its path
+        file_path = download.path()
+        print(f"✅ File downloaded to: {file_path}")
 
-def main(curso):
-    print(f"📚 Ejecutando login para el curso: {curso}")
-    run_manejo()
+    except PlaywrightTimeoutError as e:
+        print(f"❌ Timeout error: {e}")
+        _save_error_state(page, download_dir)
+        raise
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("❗ Uso: python -m descarga_archivos.download <NombreCurso>")
-        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        _save_error_state(page, download_dir)
+        raise
 
-    main(sys.argv[1])
+def _save_error_state(page: Page, download_dir: str) -> None:
+    """
+    On failure, dump a screenshot and page HTML for diagnostics.
+    """
+    err_png = Path(download_dir) / "error.png"
+    err_html = Path(download_dir) / "error.html"
+    try:
+        page.screenshot(path=str(err_png), full_page=True)
+        with open(err_html, "w", encoding="utf-8") as f:
+            f.write(page.content())
+        print(f"🧹 Saved error state to {err_png} and {err_html}")
+    except Exception as dump_err:
+        print(f"⚠️ Failed to save error artifacts: {dump_err}")

@@ -2,8 +2,7 @@ name: Weekly File Download & Upload
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
   schedule:
     - cron: '0 4 * * 3'
@@ -23,38 +22,30 @@ jobs:
           - control
 
     steps:
-      - name: "Check out code"
+      - name: Check out code
         uses: actions/checkout@v3
 
-      - name: "Debug: Show workspace layout"
-        run: |
-          echo "GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
-          ls -R .
-
-      - name: "Debug: Show workflow file"
-        run: |
-          echo "---- .github/workflows/scheduled-download.yml ----"
-          sed -n '1,200p' .github/workflows/scheduled-download.yml
-          echo "-----------------------------------------------"
-
-      - name: "Set up Python & Playwright"
+      - name: Install Python & Playwright
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: "Install dependencies"
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
           playwright install --with-deps
 
-      - name: "Run downloader ${{ matrix.task }}"
-        run: python -m descarga_archivos.download ${{ matrix.task }}
+      - name: Run downloader ${{ matrix.task }}
+        run: |
+          python download.py ${{ matrix.task }}
         env:
           F_EMAIL: ${{ secrets.F_EMAIL }}
           F_PASSWORD: ${{ secrets.F_PASSWORD }}
+          DOWNLOAD_DIR: ${{ github.workspace }}/downloads/${{ matrix.task }}
 
-
-      - name: "Upload ${{ matrix.task }} to Google Drive"
-        run: python src/descarga_archivos/upload_to_drive.py "downloads/Escuela de Excelencia/${{ matrix.task }}.xlsx"
+      - name: Upload ${{ matrix.task }} to Google Drive
+        run: |
+          python upload_to_drive.py "${{ github.workspace }}/downloads/${{ matrix.task }}/${{ matrix.task }}.xlsx"
         env:
           GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
+          GDRIVE_FOLDER_ID:      ${{ secrets.GDRIVE_FOLDER_ID }}
