@@ -7,20 +7,17 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
 def authenticate() -> GoogleDrive:
-    # 1) Load service-account JSON from env
     sa_key = os.getenv("GDRIVE_SERVICE_ACCOUNT")
     if not sa_key:
         raise RuntimeError("GDRIVE_SERVICE_ACCOUNT not set")
 
     key_dict = json.loads(sa_key)
-    # 2) Write to temp file
     with tempfile.NamedTemporaryFile(
         mode="w+", suffix=".json", delete=False
     ) as f:
         json.dump(key_dict, f)
         sa_path = f.name
 
-    # 3) Authenticate PyDrive2
     gauth = GoogleAuth()
     gauth.settings["service_config"] = {
         "client_json":    key_dict,
@@ -31,7 +28,6 @@ def authenticate() -> GoogleDrive:
     return GoogleDrive(gauth)
 
 def upload_file(filepath: str) -> None:
-    # Read folder ID from env
     folder_id = os.getenv("GDRIVE_FOLDER_ID")
     if not folder_id:
         raise RuntimeError("GDRIVE_FOLDER_ID not set")
