@@ -41,7 +41,7 @@ jobs:
           # This installs Chromium, Firefox, WebKit for Playwright
           python -m playwright install
 
-      - name: Debug: show workspace layout
+      - name: "Debug: show workspace layout"
         run: |
           echo "PWD: $(pwd)"
           ls -R .
