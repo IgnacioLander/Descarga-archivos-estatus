@@ -24,13 +24,12 @@ def descomprimir_y_leer_excel(zip_file_path: str, download_path: str, nuevo_nomb
     if not xlsx:
         return None
 
-    original = destino / xlsx[0]
-    final    = destino / f"{nuevo_nombre}.xlsx"
-    original.rename(final)
+    origen = destino / xlsx[0]
+    final  = destino / f"{nuevo_nombre}.xlsx"
+    origen.rename(final)
     return pd.read_excel(final)
 
 def run(playwright: Playwright) -> None:
-    # Prepare download folder
     download_dir  = os.path.join(os.getcwd(), "downloads", "Pilares")
     Path(download_dir).mkdir(parents=True, exist_ok=True)
     zip_file_path = os.path.join(download_dir, "Pilares.zip")
@@ -49,22 +48,40 @@ def run(playwright: Playwright) -> None:
         page.locator("input#centerPagetxtPassword").fill(PASSWORD)
         page.get_by_role("link", name="Entrar").click()
 
-        print("⏳ Waiting for dashboard…")
-        page.wait_for_selector("nav", timeout=30_000)
+        # 1) Handle the intermediate selectmode page if it appears
+        if "selectmode" in page.url:
+            print("⚙️ Detected selectmode page, choosing mode…")
+            # adjust selector to match the button text on that page
+            page.wait_for_selector("button:has-text('Profesor')", timeout=10_000)
+            page.click("button:has-text('Profesor')")
+            time.sleep(1)
 
-        print("🔎 Navigating to Pilares program")
+        # 2) Wait for the dashboard nav to become visible
+        print("⏳ Waiting for dashboard to load…")
+        page.wait_for_selector("nav.main-header", state="visible", timeout=30_000)
+        print("✅ Dashboard is visible")
+
+        # 3) Navigate into the Pilares program
+        print("🔎 Opening Pilares program…")
         page.locator("#manageIcon").click()
-        page.locator("#ctl00_TopMenuControl_TopMenuDesktopControl1_adminOrTeacherSearch").click()
-        time.sleep(2)
-        page.get_by_placeholder("Escribe aquí para buscar...").fill("pilares de la operación")
+        page.locator(
+            "#ctl00_TopMenuControl_TopMenuDesktopControl1_adminOrTeacherSearch"
+        ).click()
+        time.sleep(3)
+
+        print("🔍 Searching for 'pilares de la operación'")
+        page.fill("input[placeholder='Escribe aquí para buscar...']", "pilares de la operación")
         page.get_by_role("link", name="Buscar").click()
+
+        print("📂 Clicking the program link")
         page.get_by_role(
             "link",
             name="Programa Pilares de la Operación | Escuela de Excelencia"
         ).click()
         time.sleep(5)
 
-        print("📑 Building report…")
+        # 4) Build the report
+        print("📑 Building report")
         page.locator("#courses").click()
         page.get_by_title("Select/Deselect All").get_by_role("checkbox").check()
         page.get_by_role("link", name="Nuevo reporte").click()
@@ -73,45 +90,55 @@ def run(playwright: Playwright) -> None:
         page.get_by_text("Sin filtros").click()
         page.get_by_text("seleccionados").click()
 
-        # select/unselect columns as before…
-        # for brevity, assume your column logic remains here
+        # — Column selection —
+        to_check = ["Identifier","Department","Country","EnrolledAs"]
+        to_uncheck = [
+            "Deleted","EnrollmentDate","FirstAccessDate","LastAccessDate",
+            "GraduationDate","Satisfaction","Attendance","CourseAccessCount",
+            "TimeOnCourse","CompletedContentCount"
+        ]
+        for col in to_check:
+            page.locator(f"input[name='{col}']").check()
+        for col in to_uncheck:
+            page.locator(f"input[name='{col}']").uncheck()
 
         page.get_by_role("link", name="Aplicar").click()
         page.locator("a").filter(has_text="Exportar a excel").click()
         time.sleep(5)
 
-        # Dump page state for debugging BEFORE download
-        before_png = Path(download_dir) / "before_download.png"
-        before_html= Path(download_dir) / "before_download.html"
-        print(f"📋 Saving debug snapshot before download: {before_png.name}, {before_html.name}")
+        # 5) Dump before-download snapshot for debugging
+        before_png  = Path(download_dir) / "before_download.png"
+        before_html = Path(download_dir) / "before_download.html"
+        print(f"📋 Saving snapshot: {before_png.name}, {before_html.name}")
         page.screenshot(path=str(before_png), full_page=True)
         with open(before_html, "w", encoding="utf-8") as f:
             f.write(page.content())
 
-        print("⬇️ Waiting for download to start (up to 2 minutes)…")
+        # 6) Wait up to 2 minutes for the download event
+        print("⬇️ Waiting for download (timeout 2min)…")
         try:
             with page.expect_download(timeout=120_000) as dl_info:
-                # ensure we click the exact link that triggers the download
                 page.get_by_text("Descargar Guardando Guardado").click()
             download = dl_info.value
-            print("✅ Download event fired, saving file…")
+            print("✅ Download started, saving file…")
             download.save_as(zip_file_path)
         except PWTimeoutError:
             print("❌ Download did not start within 2 minutes!")
             raise
 
-        print("📂 Unzipping & reading Excel")
+        # 7) Unzip & read the Excel
+        print("📂 Unzipping and reading the Excel file")
         df = descomprimir_y_leer_excel(zip_file_path, download_dir, "Pilares")
         print(df.head())
 
-    except Exception as e:
+    except Exception:
         print("⚠️ Error during Pilares flow:")
         traceback.print_exc()
 
-        # Dump final page state on failure
+        # final debug artifacts
         err_png  = Path(download_dir) / "error.png"
         err_html = Path(download_dir) / "error.html"
-        print(f"🧹 Saving final debug artifacts: {err_png.name}, {err_html.name}")
+        print(f"🧹 Saving final artifacts: {err_png.name}, {err_html.name}")
         page.screenshot(path=str(err_png), full_page=True)
         with open(err_html, "w", encoding="utf-8") as f:
             f.write(page.content())
