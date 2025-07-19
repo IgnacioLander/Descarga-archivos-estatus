@@ -4,7 +4,8 @@ name: Weekly File Download & Upload
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: '0 4 * * 3'
@@ -24,32 +25,32 @@ jobs:
           - control
 
     steps:
-      - name: Check out code
+      - name: "Check out code"
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.11
+      - name: "Set up Python 3.11"
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: "Install dependencies"
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Debug: show workspace layout
+      - name: "Debug: show workspace layout"
         run: |
           echo "PWD: $(pwd)"
           ls -R .
 
-      - name: Run Selenium downloader ${{ matrix.task }}
+      - name: "Run Selenium downloader ${{ matrix.task }}"
         run: python download.py ${{ matrix.task }}
         env:
           F_EMAIL:      ${{ secrets.F_EMAIL }}
           F_PASSWORD:   ${{ secrets.F_PASSWORD }}
           DOWNLOAD_DIR: ${{ github.workspace }}/downloads/${{ matrix.task }}
 
-      - name: Upload ${{ matrix.task }} to Google Drive
+      - name: "Upload ${{ matrix.task }} to Google Drive"
         run: |
           python src/descarga_archivos/upload_to_drive.py \
             "${{ github.workspace }}/downloads/${{ matrix.task }}/${{ matrix.task }}.xlsx"
