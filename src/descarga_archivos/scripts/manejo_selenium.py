@@ -2,6 +2,7 @@
 # src/descarga_archivos/scripts/manejo_selenium.py
 
 import os
+import sys
 from pathlib import Path
 
 from selenium import webdriver
@@ -13,20 +14,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 def run_selenium():
-    """
-    Logs into academia.farmatodo.com under the 'Manejo' context,
-    triggers the report download, and saves it into DOWNLOAD_DIR.
-    """
-    # 1. Read credentials and download path from env
-    email        = os.getenv("F_EMAIL")
-    password     = os.getenv("F_PASSWORD")
+    email    = os.getenv("F_EMAIL")
+    password = os.getenv("F_PASSWORD")
     download_dir = os.getenv("DOWNLOAD_DIR", str(Path.cwd() / "downloads" / "Manejo"))
     Path(download_dir).mkdir(parents=True, exist_ok=True)
 
     if not email or not password:
         raise RuntimeError("F_EMAIL and F_PASSWORD must be set")
 
-    # 2. Configure headless Chrome and auto-download preferences
+    # Chrome headless + auto-download config
     chrome_opts = Options()
     chrome_opts.add_argument("--headless=new")
     chrome_opts.add_experimental_option("prefs", {
@@ -39,41 +35,53 @@ def run_selenium():
         service=ChromeService(ChromeDriverManager().install()),
         options=chrome_opts
     )
+    wait = WebDriverWait(driver, 20)
 
     try:
-        wait = WebDriverWait(driver, 20)
-
-        # 3. Navigate to the exact login page
-        print("🌐 Navigating to login page…")
+        # 1) Go direct to the login endpoint
+        print("🌐 Navigating to https://academia.farmatodo.com/default …")
         driver.get("https://academia.farmatodo.com/default")
 
-        # 4. Wait for the email & password inputs by tag+ID
-        print("⌛ Waiting for login fields…")
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input#topMenutxtEmail")))
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input#topMenutxtContrasena")))
+        # 2) Wait for the email textbox by placeholder
+        print("⌛ Waiting for the email field…")
+        wait.until(EC.presence_of_element_located((
+            By.CSS_SELECTOR, "input[placeholder='Email / NUMERO IDENTIDAD']"
+        )))
 
-        # 5. Fill in credentials
-        print("✍️ Filling in credentials…")
-        driver.find_element(By.CSS_SELECTOR, "input#topMenutxtEmail").send_keys(email)
-        driver.find_element(By.CSS_SELECTOR, "input#topMenutxtContrasena").send_keys(password)
+        # 3) Fill credentials via placeholder selectors
+        print("✍️ Filling credentials…")
+        driver.find_element(By.CSS_SELECTOR, "input[placeholder='Email / NUMERO IDENTIDAD']").send_keys(email)
+        driver.find_element(By.CSS_SELECTOR, "input[placeholder='Contraseña']").send_keys(password)
 
-        # 6. Submit the form
-        print("🖱️ Clicking 'Iniciar sesión'…")
-        driver.find_element(By.XPATH, "//button[text()='Iniciar sesión']").click()
+        # 4) Submit
+        print("🖱️ Clicking 'Entrar'…")
+        driver.find_element(By.LINK_TEXT, "Entrar").click()
 
-        # 7. Wait for dashboard to load
-        print("⏳ Waiting for dashboard…")
+        # 5) Wait for dashboard nav (adjust selector as needed)
+        print("⏳ Waiting for dashboard to load…")
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "nav")))
-        print("✅ Login successful")
 
-        # 8. Trigger the report download
+        # 6) Trigger the Manejo report download
         print("📥 Triggering report download…")
-        download_btn = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//button[text()='Descargar Informe']")
-        ))
-        download_btn.click()
+        # adjust this if your actual button text/selector differs
+        btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Descargar Informe']")))
+        btn.click()
 
-        print(f"✅ Download should appear in: {download_dir}")
+        print(f"✅ Download should land in: {download_dir}")
+
+    except Exception as e:
+        # On any failure, dump a screenshot & HTML for postmortem
+        dump_png = Path(download_dir) / "login_error.png"
+        dump_html = Path(download_dir) / "login_error.html"
+        try:
+            driver.save_screenshot(str(dump_png))
+            with open(dump_html, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print(f"❌ Encountered error: {e!r}")
+            print(f"🧹 Saved debug artifacts: {dump_png} + {dump_html}")
+        except Exception as dump_err:
+            print(f"⚠️ Failed writing debug artifacts: {dump_err!r}")
+        raise
 
     finally:
         driver.quit()
