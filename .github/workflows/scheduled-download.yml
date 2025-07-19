@@ -46,12 +46,23 @@ jobs:
 
       - name: "Run Selenium downloader ${{ matrix.task }}"
         run: python download.py ${{ matrix.task }}
+        continue-on-error: true
         env:
           F_EMAIL:      ${{ secrets.F_EMAIL }}
           F_PASSWORD:   ${{ secrets.F_PASSWORD }}
           DOWNLOAD_DIR: ${{ github.workspace }}/downloads/${{ matrix.task }}
 
+      - name: "Upload debug artifacts for ${{ matrix.task }}"
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-${{ matrix.task }}
+          path: |
+            downloads/${{ matrix.task }}/error.html
+            downloads/${{ matrix.task }}/error.png
+
       - name: "Upload ${{ matrix.task }} to Google Drive"
+        if: success()
         run: |
           python src/descarga_archivos/upload_to_drive.py \
             "${{ github.workspace }}/downloads/${{ matrix.task }}/${{ matrix.task }}.xlsx"
