@@ -1,8 +1,10 @@
+# .github/workflows/scheduled-download.yml
+
 name: Weekly File Download & Upload
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
   schedule:
     - cron: '0 4 * * 3'
@@ -25,11 +27,20 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Debug: show workspace layout
+        run: |
+          echo "PWD: $(pwd)"
+          ls -R .
 
       - name: Run Selenium downloader ${{ matrix.task }}
         run: python download.py ${{ matrix.task }}
@@ -39,7 +50,9 @@ jobs:
           DOWNLOAD_DIR: ${{ github.workspace }}/downloads/${{ matrix.task }}
 
       - name: Upload ${{ matrix.task }} to Google Drive
-        run: python src/descarga_archivos/upload_to_drive.py "${{ github.workspace }}/downloads/${{ matrix.task }}/${{ matrix.task }}.xlsx"
+        run: |
+          python src/descarga_archivos/upload_to_drive.py \
+            "${{ github.workspace }}/downloads/${{ matrix.task }}/${{ matrix.task }}.xlsx"
         env:
           GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
           GDRIVE_FOLDER_ID:      ${{ secrets.GDRIVE_FOLDER_ID }}
