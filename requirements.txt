@@ -34,3 +34,8 @@ typing_extensions==4.14.1
 tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
+selenium
+webdriver-manager
+pandas
+openpyxl     # Excel engine for pandas.read_excel
+pydrive2     # for upload_to_drive.py
