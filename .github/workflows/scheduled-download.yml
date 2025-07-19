@@ -54,7 +54,7 @@ jobs:
 
       - name: "Upload debug artifacts for ${{ matrix.task }}"
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: debug-${{ matrix.task }}
           path: |
