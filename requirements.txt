@@ -10,3 +10,6 @@ openpyxl>=3.0.0
 
 # Google Drive upload
 PyDrive2>=1.21.3
+
+# Playwright Python bindings + browsers
+playwright>=1.53.0

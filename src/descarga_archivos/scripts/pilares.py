@@ -1,29 +1,33 @@
+#!/usr/bin/env python3
+# src/descarga_archivos/scripts/pilares_playwright.py
+
 import os
 import time
 import zipfile
 import pandas as pd
-from playwright.sync_api import Playwright
+from pathlib import Path
+from playwright.sync_api import Playwright, sync_playwright
 
 EMAIL = os.getenv("F_EMAIL")
 PASSWORD = os.getenv("F_PASSWORD")
 
-def descomprimir_y_leer_excel(zip_file_path, download_path, nuevo_nombre):
+def descomprimir_y_leer_excel(zip_file_path: str, download_path: str, nuevo_nombre: str):
     carpeta_destino = "Escuela de Excelencia"
-    nueva_carpeta = os.path.join(download_path, carpeta_destino)
-    os.makedirs(nueva_carpeta, exist_ok=True)
+    destino = Path(download_path) / carpeta_destino
+    destino.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-        zip_ref.extractall(nueva_carpeta)
-        archivos_extraidos = zip_ref.namelist()
+    with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+        zip_ref.extractall(destino)
+        extraidos = zip_ref.namelist()
 
-    archivo_excel = [f for f in archivos_extraidos if f.endswith('.xlsx')]
-    if not archivo_excel:
+    xlsx = [f for f in extraidos if f.endswith(".xlsx")]
+    if not xlsx:
         return None
 
-    archivo_excel_path = os.path.join(nueva_carpeta, archivo_excel[0])
-    nuevo_excel_file_path = os.path.join(nueva_carpeta, f"{nuevo_nombre}.xlsx")
-    os.rename(archivo_excel_path, nuevo_excel_file_path)
-    return pd.read_excel(nuevo_excel_file_path)
+    original = destino / xlsx[0]
+    renombrado = destino / f"{nuevo_nombre}.xlsx"
+    original.rename(renombrado)
+    return pd.read_excel(renombrado)
 
 def run(playwright: Playwright) -> None:
     download_path = os.path.join(os.getcwd(), "downloads")
@@ -31,16 +35,18 @@ def run(playwright: Playwright) -> None:
     zip_file_path = os.path.join(download_path, "Pilares.zip")
 
     browser = playwright.chromium.launch(headless=True)
-    context = browser.new_context()
+    context = browser.new_context(accept_downloads=True)
     page = context.new_page()
 
-    # Login
+    # — LOGIN (fixed selectors matching the real IDs on /default) —
     page.goto("https://academia.farmatodo.com/default")
-    page.get_by_role("textbox", name="Email / NUMERO IDENTIDAD").fill(EMAIL)
-    page.get_by_role("textbox", name="Contraseña").fill(PASSWORD)
+    page.locator("input#centerPagetxtEmail").click()
+    page.locator("input#centerPagetxtEmail").fill(EMAIL)
+    page.locator("input#centerPagetxtPassword").click()
+    page.locator("input#centerPagetxtPassword").fill(PASSWORD)
     page.get_by_role("link", name="Entrar").click()
 
-    # Navigate to “Pilares de la Operación”
+    # — NAVIGATE to “Pilares de la Operación” —
     page.locator("#manageIcon").click()
     page.locator("#ctl00_TopMenuControl_TopMenuDesktopControl1_adminOrTeacherSearch").click()
     time.sleep(3)
@@ -49,7 +55,7 @@ def run(playwright: Playwright) -> None:
     page.get_by_role("link", name="Programa Pilares de la Operación | Escuela de Excelencia").click()
     time.sleep(5)
 
-    # Build report
+    # — BUILD REPORT —
     page.locator("#courses").click()
     page.get_by_title("Select/Deselect All").get_by_role("checkbox").check()
     page.get_by_role("link", name="Nuevo reporte").click()
@@ -58,29 +64,36 @@ def run(playwright: Playwright) -> None:
     page.get_by_text("Sin filtros").click()
     page.get_by_text("seleccionados").click()
 
-    # Columns selection
-    for col in ["Identifier","Department","EnrolledAs","Country","UserStatus"]:
-        page.locator(f"input[name=\"{col}\"]").check()
-    for col in ["Deleted","EnrollmentDate","FirstAccessDate",
-                "LastAccessDate","GraduationDate","Satisfaction",
-                "Attendance","CourseAccessCount","TimeOnCourse","CompletedContentCount"]:
-        page.locator(f"input[name=\"{col}\"]").uncheck()
-    page.locator("input[name=\"Progress\"]").check()
+    # — COLUMNS SELECTION —
+    for col in ["Identifier","Department","EnrolledAs","Country","UserStatus","Progress"]:
+        page.locator(f"input[name='{col}']").check()
+    for col in [
+        "Deleted","EnrollmentDate","FirstAccessDate","LastAccessDate",
+        "GraduationDate","Satisfaction","Attendance","CourseAccessCount",
+        "TimeOnCourse","CompletedContentCount"
+    ]:
+        page.locator(f"input[name='{col}']").uncheck()
 
     page.get_by_role("link", name="Aplicar").click()
-    page.locator("a").filter(has_text="Exportar a excel").click()
 
-    # Download
-    time.sleep(90)
+    # — EXPORT & DOWNLOAD —
+    page.locator("a").filter(has_text="Exportar a excel").click()
+    # give the server time to prepare the file
+    time.sleep(5)
+
     with page.expect_download() as download_info:
         page.get_by_text("Descargar Guardando Guardado").click()
     download = download_info.value
     download.save_as(zip_file_path)
 
-    # Extract & rename
+    # — UNZIP & READ —
     df = descomprimir_y_leer_excel(zip_file_path, download_path, "Pilares")
     print(df)
 
     context.storage_state(path="auth.json")
     context.close()
     browser.close()
+
+if __name__ == "__main__":
+    with sync_playwright() as pw:
+        run(pw)

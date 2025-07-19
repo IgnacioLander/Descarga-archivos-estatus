@@ -1,12 +1,8 @@
-# .github/workflows/scheduled-download.yml
-
 name: Weekly File Download & Upload
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   workflow_dispatch:
   schedule:
     - cron: '0 4 * * 3'
@@ -26,25 +22,31 @@ jobs:
           - control
 
     steps:
-      - name: "Check out code"
+      - name: Check out code
         uses: actions/checkout@v3
 
-      - name: "Set up Python 3.11"
+      - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: "Install dependencies"
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: "Debug: show workspace layout"
+      - name: Install Playwright Browsers
+        if: matrix.task == 'Pilares'
+        run: |
+          # This installs Chromium, Firefox, WebKit for Playwright
+          python -m playwright install
+
+      - name: Debug: show workspace layout
         run: |
           echo "PWD: $(pwd)"
           ls -R .
 
-      - name: "Run Selenium downloader ${{ matrix.task }}"
+      - name: Run downloader ${{ matrix.task }}
         run: python download.py ${{ matrix.task }}
         continue-on-error: true
         env:
@@ -52,7 +54,7 @@ jobs:
           F_PASSWORD:   ${{ secrets.F_PASSWORD }}
           DOWNLOAD_DIR: ${{ github.workspace }}/downloads/${{ matrix.task }}
 
-      - name: "Upload debug artifacts for ${{ matrix.task }}"
+      - name: Upload debug artifacts for ${{ matrix.task }}
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -61,7 +63,7 @@ jobs:
             downloads/${{ matrix.task }}/error.html
             downloads/${{ matrix.task }}/error.png
 
-      - name: "Upload ${{ matrix.task }} to Google Drive"
+      - name: Upload ${{ matrix.task }} to Google Drive
         if: success()
         run: |
           python src/descarga_archivos/upload_to_drive.py \
